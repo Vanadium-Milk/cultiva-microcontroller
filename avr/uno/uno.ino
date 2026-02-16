@@ -119,6 +119,14 @@ void loop() {
           temperature = dht.readTemperature();
         }
 
+        if (sensor_active(3)) {
+          soil_hum = analogRead(A0);
+        }
+
+        if (sensor_active(2)) {
+          light = analogRead(A1);
+        }
+
         Serial.println(
             def_or_empty(temperature, sensor_active(4)) +
             def_or_empty(humidity, sensor_active(4)) +
