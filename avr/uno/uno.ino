@@ -1,10 +1,20 @@
 //Specify available sensors in compile time using a bitflag
 //DHT is often the most common termometer, so adding in as hygrometer as well, support for other kinds of hardware may be added later
+//Thermometer and hygrometer 16
+//SoilHygrometer 8
+//Luminometer 4
+//Co2 2
+//PH 
 #ifndef SENSORS
-  #define SENSORS 16
+  #define SENSORS 0
 #endif
 
 //Same thing with actuators
+//Irrigator 16
+//Heater 8
+//Lighting 4
+//UV light 2
+//Shading 1
 #ifndef ACTUATORS
   #define ACTUATORS 0
 #endif
@@ -25,17 +35,22 @@ float ph = 0;
 char byte_stream[2];
 int byte_read;
 
-//Decode sensor bitflag currently 6 sensors supported
-//Thermometer and hygrometer 16
-//SoilHygrometer 8
-//Luminometer 4
-//Co2 2
-//PH 
-bool is_s_active(int id) {
-  int bit_val = ceil(pow(2, id));
-  return (SENSORS % (bit_val * 2)) >= bit_val;
+bool has_bit(int bitflag, int position) {
+  int bit_val = ceil(pow(2, position));
+  return (bitflag % (bit_val * 2)) >= bit_val;
 }
 
+//Decode sensor bitflag currently 5 sensors supported
+bool sensor_active(int id) {
+  return has_bit(SENSORS, id);
+}
+
+//Decode sensor bitflag currently 5 sensors supported
+bool actuator_active(int id) {
+  return has_bit(ACTUATORS, id);
+}
+
+//Helper function for displaying sensor data
 String def_or_empty(int value, bool defined) {
   if (defined) {
     return String(value) + ",";
@@ -56,8 +71,26 @@ void setup() {
       delay(5000);
     }
   }
+  else if (ACTUATORS > 31 || ACTUATORS < 0) {
+    while (true) {
+      Serial.println("ACTUATOR bitflag unsupported, provide an integer between 0 and 31");
+      delay(5000);
+    }
+  }
+  else if (ACTUATORS == 0 && SENSORS == 0) {
+    while (true) {
+      Serial.println("No sensors nor actuators bitflags provided, make sure to define them at compile time");
+      delay(5000);
+    }
+  }
 
-  if (is_s_active(4)){
+  //Start actuator pins as outputs
+  for (int i = 8; i <= 12; i++) {
+    pinMode(i, OUTPUT);
+    digitalWrite(i, LOW);
+  }
+
+  if (sensor_active(4)){
     dht.begin();
   }
 }
@@ -68,43 +101,49 @@ void loop() {
     // read the incoming byte:
     byte_read = Serial.readBytes(byte_stream, 1);
 
-    //Using another bitflag for actuator relays
-    switch (byte_stream[0]){
-      case '0':
-        // read all the sensor values, skip if no sensors are available
+    char input = byte_stream[0];
+    int i_value;
+
+    //Encode input into a bitflag from 0 to 35 more characters will be added if necessary
+    if (isdigit(input)) {
+      i_value = input - 48;
+
+      if (i_value == 0) {
         if (SENSORS <= 0) {
           Serial.println("No data");
           return;
         }
 
-        if (is_s_active(4)) {
+        if (sensor_active(4)) {
           humidity = dht.readHumidity();
           temperature = dht.readTemperature();
         }
 
         Serial.println(
-            def_or_empty(temperature, is_s_active(4)) +
-            def_or_empty(humidity, is_s_active(4)) +
-            def_or_empty(soil_hum, is_s_active(3)) +
-            def_or_empty(light, is_s_active(2)) +
-            def_or_empty(co2, is_s_active(1)) +
-            def_or_empty(ph, is_s_active(0))
+            def_or_empty(temperature, sensor_active(4)) +
+            def_or_empty(humidity, sensor_active(4)) +
+            def_or_empty(soil_hum, sensor_active(3)) +
+            def_or_empty(light, sensor_active(2)) +
+            def_or_empty(co2, sensor_active(1)) +
+            def_or_empty(ph, sensor_active(0))
           );
-        break;
-
-      //Open or close relays
-      case '1':
-        Serial.println("00");
-        break;
-      case '2':
-        Serial.println("10");
-        break;
-      case '3':
-        Serial.println("01");
-        break;
-      case '4':
-        Serial.println("11");
-        break;
+        return;
+      }
     }
+    else if (isupper(input)){
+      i_value = input - 55;
+    }
+    else {
+      return;
+    }
+
+    //Limit bitflag to 5 bits + 1
+    if (i_value > 32) { return; } 
+    //Activate actuators using the provided bitflag
+    for (int i = 8; i <= 12; i++) {
+      digitalWrite(i, (actuator_active(i - 8) && has_bit(i_value - 1, i - 8)? HIGH : LOW));
+    }
+
+    Serial.println(i_value);
   }
 }
