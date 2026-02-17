@@ -120,7 +120,7 @@ void loop() {
         }
 
         if (sensor_active(3)) {
-          soil_hum = analogRead(A0);
+          soil_hum = 1023 - analogRead(A0);
         }
 
         if (sensor_active(2)) {
