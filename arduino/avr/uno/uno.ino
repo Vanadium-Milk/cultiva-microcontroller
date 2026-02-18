@@ -27,7 +27,7 @@ DHT dht(2, DHT11);
 float temperature = 0;
 float humidity = 0;
 float soil_hum = 0;
-int light = 0;
+float light = 0;
 float co2 = 0;
 float ph = 0;
 
@@ -51,7 +51,7 @@ bool actuator_active(int id) {
 }
 
 //Helper function for displaying sensor data
-String def_or_empty(int value, bool defined) {
+String def_or_empty(float value, bool defined) {
   if (defined) {
     return String(value) + ",";
   }
@@ -120,11 +120,11 @@ void loop() {
         }
 
         if (sensor_active(3)) {
-          soil_hum = 1023 - analogRead(A0);
+          soil_hum = (1023 - analogRead(A0)) / 10.23;
         }
 
         if (sensor_active(2)) {
-          light = analogRead(A1);
+          light = analogRead(A1) / 10.23;
         }
 
         Serial.println(
