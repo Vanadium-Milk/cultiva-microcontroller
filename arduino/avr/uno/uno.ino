@@ -152,6 +152,6 @@ void loop() {
       digitalWrite(i, (actuator_active(i - 8) && has_bit(i_value - 1, i - 8)? HIGH : LOW));
     }
 
-    Serial.println(i_value);
+    Serial.print(input);
   }
 }
