@@ -1,3 +1,8 @@
+#include "DHT.h"
+#include <Arduino.h>
+#include <SensirionI2cScd30.h>
+#include <Wire.h>
+
 //Specify available sensors in compile time using a bitflag
 //DHT is often the most common termometer, so adding in as hygrometer as well, support for other kinds of hardware may be added later
 //Thermometer and hygrometer 16
@@ -19,9 +24,21 @@
   #define ACTUATORS 0
 #endif
 
+//Inverted sensors flags
+#ifndef INVERT
+  #define INVERT 0
+#endif
+
+// macro definitions
+// make sure that we use the proper definition of NO_ERROR
+#ifdef NO_ERROR
+#undef NO_ERROR
+#endif
+#define NO_ERROR 0
+
 //Might later add support for pin selection
-#include "DHT.h"
 DHT dht(2, DHT11);
+SensirionI2cScd30 sensor;
 
 //Runtime read variables
 float temperature = 0;
@@ -34,6 +51,10 @@ float ph = 0;
 //Recieve commands on serial with bytes
 char byte_stream[2];
 int byte_read;
+
+//Error messages for SCD30
+static char errorMessage[64];
+static int16_t error;
 
 bool has_bit(int bitflag, int position) {
   int bit_val = ceil(pow(2, position));
@@ -90,8 +111,33 @@ void setup() {
     digitalWrite(i, LOW);
   }
 
+  //Activate DHT11
   if (sensor_active(4)){
     dht.begin();
+  }
+  //Sensiron scd30 configuration
+  if (sensor_active(1)){
+    Wire.begin();
+    sensor.begin(Wire, SCD30_I2C_ADDR_61);
+
+    sensor.stopPeriodicMeasurement();
+    sensor.softReset();
+    delay(2000);
+    uint8_t major = 0;
+    uint8_t minor = 0;
+    error = sensor.readFirmwareVersion(major, minor);
+    if (error != NO_ERROR) {
+        Serial.print("Error trying to execute readFirmwareVersion(): ");
+        errorToString(error, errorMessage, sizeof errorMessage);
+        Serial.println(errorMessage);
+        return;
+    }
+    error = sensor.startPeriodicMeasurement(0);
+    if (error != NO_ERROR) {
+      Serial.print("Error trying to execute startPeriodicMeasurement(): ");
+      errorToString(error, errorMessage, sizeof errorMessage);
+      Serial.println(errorMessage);
+    }
   }
 }
 
@@ -127,6 +173,11 @@ void loop() {
           light = analogRead(A1) / 10.23;
         }
 
+        if (sensor_active(1)) {
+          //Prefer retrieving temperature and humidity from SCD30 sensor rather than DHT11
+          sensor.blockingReadMeasurementData(co2, temperature, humidity);
+        }
+
         Serial.println(
             def_or_empty(temperature, sensor_active(4)) +
             def_or_empty(humidity, sensor_active(4)) +
@@ -149,7 +200,7 @@ void loop() {
     if (i_value > 32) { return; } 
     //Activate actuators using the provided bitflag
     for (int i = 8; i <= 12; i++) {
-      digitalWrite(i, (actuator_active(i - 8) && has_bit(i_value - 1, i - 8)? HIGH : LOW));
+      digitalWrite(i, ((actuator_active(i - 8) && has_bit(i_value - 1, i - 8)) != has_bit(INVERT, i - 8)? HIGH : LOW));
     }
 
     Serial.print(input);
