@@ -108,7 +108,8 @@ void setup() {
   //Start actuator pins as outputs
   for (int i = 8; i <= 12; i++) {
     pinMode(i, OUTPUT);
-    digitalWrite(i, LOW);
+    //Turn off all actuators from the begining
+    digitalWrite(i, has_bit(INVERT, i - 8)? HIGH : LOW);
   }
 
   //Activate DHT11
