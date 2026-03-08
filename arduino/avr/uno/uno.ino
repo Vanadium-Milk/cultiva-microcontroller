@@ -83,7 +83,6 @@ String def_or_empty(float value, bool defined) {
 
 void setup() {
   Serial.begin(9600);
-  while (!Serial);
   
   if (SENSORS > 31 || SENSORS < 0) {
     //Arduino doesn't handle exceptions very well, trap into loop instead
