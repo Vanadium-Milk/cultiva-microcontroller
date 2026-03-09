@@ -1,0 +1,2 @@
+DHT sensor library
+Sensirion I2C SCD30
